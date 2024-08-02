@@ -85,3 +85,27 @@ func main() {
 	fmt.Scanln()
 }
 ```
+
+### Preliminary checks before opening Zathura
+
+To preview a PDF, we need to make sure that:
+- The file is indeed a PDF
+- That Zathura is present in the `$PATH`.
+
+```go
+func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
+	// Preliminary checks:
+
+	if strings.ToLower(filepath.Ext(filePath)) != ".pdf" {
+		return nil, fmt.Errorf("Provided file is not a PDF: %s\n", filePath)
+	}
+
+	if _, err := exec.LookPath("zathura"); err != nil {
+		return nil, fmt.Errorf("Command Zathura not found")
+	}
+
+	// FIXME: Open Zathura.
+
+	return nil, fmt.Errorf("OpenPdfPreview: Not implemented")
+}
+```
