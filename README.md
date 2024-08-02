@@ -109,3 +109,30 @@ func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
 	return nil, fmt.Errorf("OpenPdfPreview: Not implemented")
 }
 ```
+
+### Opening zathura
+
+I added the following code to `OpenPdfPreview` after making sure that the
+preliminary checks pass:
+
+```go
+// Open Zathura:
+
+cmd := exec.Command("zathura", filePath)
+if err := cmd.Start(); err != nil {
+    return nil, fmt.Errorf("failed to start zathura: %v", err)
+}
+
+return &PdfPreviewProcess{cmd: cmd}, nil
+```
+
+This succeeds in opening the PDF preview.
+
+If I kill the Go program using a keyboard interrupt `C-c`, the child Zathura
+process dies with it, but it's not the same case when I press enter. What's
+currently missing is to:
+
+What's currently missing is to:
+- Add a signal trap that kills the child process if it still lives when the
+  program exits.
+- Kill the previewer process "gracefully" when the user presses enter.

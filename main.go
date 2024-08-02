@@ -23,9 +23,14 @@ func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
 		return nil, fmt.Errorf("Command Zathura not found")
 	}
 
-	// FIXME: Open Zathura.
+	// Open Zathura:
 
-	return nil, fmt.Errorf("OpenPdfPreview: Not implemented")
+	cmd := exec.Command("zathura", filePath)
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start zathura: %v", err)
+	}
+
+	return &PdfPreviewProcess{cmd: cmd}, nil
 }
 
 func (ppp *PdfPreviewProcess) Close() error {
