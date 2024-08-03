@@ -19,7 +19,7 @@ type PdfPreviewProcess struct {
 func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
 	// Preliminary checks
 	if strings.ToLower(filepath.Ext(filePath)) != ".pdf" {
-		return nil, fmt.Errorf("Provided file is not a PDF: %s\n", filePath)
+		return nil, fmt.Errorf("provided file is not a PDF: %s", filePath)
 	}
 
 	if _, err := exec.LookPath("zathura"); err != nil {
@@ -44,13 +44,13 @@ func (ppp *PdfPreviewProcess) Close() error {
 func main() {
 	// Check if the file path is provided
 	if len(os.Args) < 2 {
-		fmt.Printf("Usage: go run main.go <file-path>")
+		fmt.Fprintf(os.Stderr, "Usage: %s <file-path>\n", os.Args[0])
 		os.Exit(1)
 	}
 
 	ppp, err := OpenPdfPreview(os.Args[1])
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 	defer ppp.Close()
