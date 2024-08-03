@@ -27,6 +27,7 @@ func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
 	// Open Zathura:
 
 	cmd := exec.Command("zathura", filePath)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start zathura: %v", err)
 	}
@@ -35,7 +36,7 @@ func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
 }
 
 func (ppp *PdfPreviewProcess) Close() error {
-	return syscall.Kill(ppp.cmd.Process.Pid, syscall.SIGKILL)
+	return syscall.Kill(-ppp.cmd.Process.Pid, syscall.SIGKILL) // Negative sign sends signal to whole process group.
 }
 
 func main() {
