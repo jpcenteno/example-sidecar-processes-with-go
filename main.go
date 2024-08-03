@@ -10,13 +10,14 @@ import (
 	"syscall"
 )
 
+// PdfPreviewProcess holds the command for the zathura process
 type PdfPreviewProcess struct {
 	cmd *exec.Cmd
 }
 
+// OpenPdfPreview starts a zathura process with the given file path
 func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
-	// Preliminary checks:
-
+	// Preliminary checks
 	if strings.ToLower(filepath.Ext(filePath)) != ".pdf" {
 		return nil, fmt.Errorf("Provided file is not a PDF: %s\n", filePath)
 	}
@@ -25,8 +26,7 @@ func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
 		return nil, fmt.Errorf("Command Zathura not found")
 	}
 
-	// Open Zathura:
-
+	// Open Zathura
 	cmd := exec.Command("zathura", filePath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
 	if err := cmd.Start(); err != nil {
@@ -36,6 +36,7 @@ func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
 	return &PdfPreviewProcess{cmd: cmd}, nil
 }
 
+// Close kills the zathura process
 func (ppp *PdfPreviewProcess) Close() error {
 	return syscall.Kill(-ppp.cmd.Process.Pid, syscall.SIGKILL) // Negative sign sends signal to whole process group.
 }
@@ -63,6 +64,6 @@ func main() {
 		os.Exit(1)
 	}()
 
-	fmt.Println("Press enter to close the PDF previewer")
+	fmt.Println("Press Enter to close the PDF previewer")
 	fmt.Scanln()
 }
