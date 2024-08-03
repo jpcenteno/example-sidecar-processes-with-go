@@ -136,3 +136,11 @@ What's currently missing is to:
 - Add a signal trap that kills the child process if it still lives when the
   program exits.
 - Kill the previewer process "gracefully" when the user presses enter.
+
+### Implementing `PdfPreviewProcess.Close`
+
+```go
+func (ppp *PdfPreviewProcess) Close() error {
+	return syscall.Kill(ppp.cmd.Process.Pid, syscall.SIGKILL)
+}
+```

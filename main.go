@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 type PdfPreviewProcess struct {
@@ -34,7 +35,7 @@ func OpenPdfPreview(filePath string) (*PdfPreviewProcess, error) {
 }
 
 func (ppp *PdfPreviewProcess) Close() error {
-	return fmt.Errorf("Close: Not implemented")
+	return syscall.Kill(ppp.cmd.Process.Pid, syscall.SIGKILL)
 }
 
 func main() {
