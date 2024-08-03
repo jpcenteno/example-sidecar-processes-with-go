@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -52,6 +53,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer ppp.Close()
+
+	// Set up signal handling to clean up on SIGINT (Ctrl-C)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-c
+		ppp.Close()
+		os.Exit(1)
+	}()
 
 	fmt.Println("Press enter to close the PDF previewer")
 	fmt.Scanln()

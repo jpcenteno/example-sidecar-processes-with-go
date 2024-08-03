@@ -243,3 +243,24 @@ while `zathura` belongs to a different group.
 
 The change that I noticed is that the preview window survives the go program
 after killing it with `C-c`, so that is something to fix.
+
+### Killing the child process on SIGINT
+
+I added goroutine that traps SIGINT and SIGTERM and kills the child process.
+This ensures that the program does not leak the preview process on ungraceful
+exit.
+
+```go
+// Open the preview process.
+
+// Set up signal handling to clean up on SIGINT (Ctrl-C)
+c := make(chan os.Signal, 1)
+signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+go func() {
+	<-c
+	ppp.Close()
+	os.Exit(1) // Exit so that the program stops expecting the user to press enter.
+}()
+
+// Wait for the user to press the enter key.
+```
