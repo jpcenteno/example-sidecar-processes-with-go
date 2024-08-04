@@ -44,26 +44,29 @@ func (ppp *PdfPreviewProcess) Close() error {
 func main() {
 	// Check if the file path is provided
 	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <file-path>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [FILE]...\n", os.Args[0])
 		os.Exit(1)
 	}
 
-	ppp, err := OpenPdfPreview(os.Args[1])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
-	defer ppp.Close()
+	files := os.Args[1:]
+	for _, file := range files {
+		ppp, err := OpenPdfPreview(file)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
 
-	// Set up signal handling to clean up on SIGINT (Ctrl-C)
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-c
+		// Set up signal handling to clean up on SIGINT (Ctrl-C)
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+		go func() {
+			<-c
+			ppp.Close()
+			os.Exit(1)
+		}()
+
+		fmt.Println("Press Enter to close the PDF previewer")
+		fmt.Scanln()
 		ppp.Close()
-		os.Exit(1)
-	}()
-
-	fmt.Println("Press Enter to close the PDF previewer")
-	fmt.Scanln()
+	}
 }

@@ -264,3 +264,67 @@ go func() {
 
 // Wait for the user to press the enter key.
 ```
+
+### Opening a sequence of files in a loop
+
+One of the use cases from the original project requires previewing a sequence of
+files in a loop. Changing the program was very simple:
+
+```go
+files := os.Args[1:]
+for _, file := range files {
+	ppp, err := OpenPdfPreview(file)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+
+	// Set up signal handling to clean up on SIGINT (Ctrl-C)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-c
+		ppp.Close()
+		os.Exit(1)
+	}()
+
+	fmt.Println("Press Enter to close the PDF previewer")
+	fmt.Scanln()
+	ppp.Close()
+}
+```
+
+```sh
+go run main.go pdfs/*
+```
+
+I learned that `defer` works at a function level, so I had to change that line
+and put the call to `ppp.Close()` at the end of the loop.
+
+#### The program structure might become messy
+
+One thing that I notice now is that the program has the following structure:
+
+```
+for _, file := range files {
+    // Open preview
+    // Start interrupt handler
+
+    // Do something with the preview on
+
+    // Close preview
+//
+}
+```
+
+Comming from a FP background, I'm tempted to refactor the loops body into a
+higher order function to ensure that the "do something" part does not mess up
+with the rest of the setup and teardown code. I will keep it this way for now,
+but might do something about it in the future.
+
+#### Preview process corner cases:
+
+- [ ] How to handle the case where the user accidentally closes the preview
+  window? What should the program do when the preview window closes due to a
+  failure vs when the user closes the window?
+- [ ] How do we know that we are killing the right process?
