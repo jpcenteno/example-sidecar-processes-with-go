@@ -327,4 +327,47 @@ but might do something about it in the future.
 - [ ] How to handle the case where the user accidentally closes the preview
   window? What should the program do when the preview window closes due to a
   failure vs when the user closes the window?
-- [ ] How do we know that we are killing the right process?
+- [ ] How do we know that we are killing the right process? (Race condition
+  where the process dies and the OS creates an unrelated process group with the
+  same PGID) How probable is this scenario?
+
+### Refactoring the preview function to separate process logic from application logic
+
+After noticing that the main loop was mixing process and application logic I
+gave it a thought and decided to abstract it away. My solution was to replace
+the `openPdfPreview` function with a higher order function called
+`withPdfPreview`. The new function extends the previous code with a new
+parameter of the type `func(string) error`. The closure receives the
+file path as parameter and is expected to implement the application logic.
+
+```go
+func withPreview(filePath string, action func(string) error) error {
+	// Ensure that fipePath is a PDF.
+	// Ensure that the Zathura command is available.
+
+	// Open Zathura
+
+	ppp := &PdfPreviewProcess{cmd: cmd}
+	defer ppp.Close() // This will run after return.
+
+	// Set up signal handling to clean up on SIGINT (Ctrl-C)
+
+	return action(filePath) // Runs application logic.
+}
+```
+
+This change hides all the preview process logic from the main loop:
+
+```go
+files := os.Args[1:]
+for _, file := range files {
+	err := withPreview(file, func(file string) error {
+		fmt.Println("Press Enter to close the PDF previewer for", file)
+		fmt.Scanln()
+		return nil
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+	}
+}
+```

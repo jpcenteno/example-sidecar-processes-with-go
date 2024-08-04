@@ -41,6 +41,38 @@ func (ppp *PdfPreviewProcess) Close() error {
 	return syscall.Kill(-ppp.cmd.Process.Pid, syscall.SIGKILL) // Negative sign sends signal to whole process group.
 }
 
+func withPreview(filePath string, action func(string) error) error {
+	// Preliminary checks
+	if strings.ToLower(filepath.Ext(filePath)) != ".pdf" {
+		return fmt.Errorf("provided file is not a PDF: %s", filePath)
+	}
+
+	if _, err := exec.LookPath("zathura"); err != nil {
+		return fmt.Errorf("Command Zathura not found")
+	}
+
+	// Open Zathura
+	cmd := exec.Command("zathura", filePath)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start zathura: %v", err)
+	}
+
+	ppp := &PdfPreviewProcess{cmd: cmd}
+	defer ppp.Close()
+
+	// Set up signal handling to clean up on SIGINT (Ctrl-C)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-c
+		ppp.Close()
+		os.Exit(1)
+	}()
+
+	return action(filePath)
+}
+
 func main() {
 	// Check if the file path is provided
 	if len(os.Args) < 2 {
@@ -50,23 +82,13 @@ func main() {
 
 	files := os.Args[1:]
 	for _, file := range files {
-		ppp, err := OpenPdfPreview(file)
+		err := withPreview(file, func(file string) error {
+			fmt.Println("Press Enter to close the PDF previewer for", file)
+			fmt.Scanln()
+			return nil
+		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
 		}
-
-		// Set up signal handling to clean up on SIGINT (Ctrl-C)
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-		go func() {
-			<-c
-			ppp.Close()
-			os.Exit(1)
-		}()
-
-		fmt.Println("Press Enter to close the PDF previewer")
-		fmt.Scanln()
-		ppp.Close()
 	}
 }
