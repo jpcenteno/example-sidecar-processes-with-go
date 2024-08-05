@@ -19,16 +19,21 @@ go run main.go <preview-command> <file1> <file2> ...
 ```
 
 I added a directory called `sample-files/` which you can use to test the
-program. Here is an example using [Zathura](https://pwmt.org/projects/zathura/),
-a document viewer for Linux.
+program.
+
+Here is an example using [Zathura](https://pwmt.org/projects/zathura/),
+a document viewer for Linux to preview PDFs.
 
 ```sh
 go run main.go zathura sample-files/*.pdf
 ```
 
-I don't have a Mac OS computer at hand, but I guess that you could try the
-`open` command. I don't know whether killing the process group will work or not.
-Please tell me if you try it.
+Here is another example that uses a preview script that can handle either jpg or
+pdf files:
+
+```sh
+go run main.go ./preview.sh sample-files/*
+```
 
 ## Features
 
@@ -46,8 +51,26 @@ Please tell me if you try it.
   This is the case where the exit code is 0.
 - [ ] Handle the case where the preview process fails and exits with non-zero
   exit code.
+- [ ] Try it on Mac OS.
+    - I don't have a Mac OS computer at hand, but I guess that you could try it
+      with the `open` command. I don't know whether killing the process group
+      will work or not. Please tell me if you try it.
+
+## Credits for the sample files
+
+- `sample-files/cat.pdf` was authored by Wikipedia user
+  [Von.grzanka](https://en.wikipedia.org/wiki/User:Von.grzanka) and licensed
+  under the
+  [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/deed.en)
+  license. Here is a [link to the image](https://en.wikipedia.org/wiki/File:Felis_catus-cat_on_snow.jpg).
+- The PDF files were sourced from the
+  [University of Waterloo sample PDF documents](https://uwaterloo.ca/onbase/help/sample-pdf-documents).
+
+A big thanks to them for sharing those files with the world!
 
 ## Development log
+
+FIXME clean up this draft. Sorry for the typos.
 
 ### Created a Nix flake with a devshell for Go
 
