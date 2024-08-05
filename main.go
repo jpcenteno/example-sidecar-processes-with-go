@@ -17,10 +17,21 @@ type PdfPreviewProcess struct {
 
 // Close kills the zathura process
 func (ppp *PdfPreviewProcess) Close() error {
-	return syscall.Kill(-ppp.cmd.Process.Pid, syscall.SIGKILL) // Negative sign sends signal to whole process group.
+	// Do nothing when no process is running. This avoids a nil pointer
+	// dereference.
+	if ppp.cmd == nil {
+		return nil
+	}
+
+	// The negative sign broadcasts the signal to the whole process group
+	err := syscall.Kill(-ppp.cmd.Process.Pid, syscall.SIGKILL)
+	if err == nil {
+		ppp.cmd = nil // Keep the `cmd` on error.
+	}
+	return err
 }
 
-func withPreview(filePath string, action func(string) error) error {
+func (ppp *PdfPreviewProcess) withPreview(filePath string, action func(string) error) error {
 	// Preliminary checks
 	if strings.ToLower(filepath.Ext(filePath)) != ".pdf" {
 		return fmt.Errorf("provided file is not a PDF: %s", filePath)
@@ -31,23 +42,13 @@ func withPreview(filePath string, action func(string) error) error {
 	}
 
 	// Open Zathura
-	cmd := exec.Command("zathura", filePath)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
-	if err := cmd.Start(); err != nil {
+	ppp.cmd = exec.Command("zathura", filePath)
+	ppp.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
+	if err := ppp.cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start zathura: %v", err)
 	}
 
-	ppp := &PdfPreviewProcess{cmd: cmd}
 	defer ppp.Close()
-
-	// Set up signal handling to clean up on SIGINT (Ctrl-C)
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-c
-		ppp.Close()
-		os.Exit(1)
-	}()
 
 	return action(filePath)
 }
@@ -59,9 +60,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	ppp := PdfPreviewProcess{}
+
+	// Set up a signal handler to clean up child processes on SIGINT (Ctrl-C)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-c
+		ppp.Close()
+		os.Exit(1)
+	}()
+
 	files := os.Args[1:]
 	for _, file := range files {
-		err := withPreview(file, func(file string) error {
+		err := ppp.withPreview(file, func(file string) error {
 			fmt.Println("Press Enter to close the PDF previewer for", file)
 			fmt.Scanln()
 			return nil

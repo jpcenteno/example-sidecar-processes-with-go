@@ -371,3 +371,113 @@ for _, file := range files {
 	}
 }
 ```
+
+### Fixing some problems with the `Close` method
+
+During manual testing, I've noticed that the `Close()` method raised a
+segmentation fault due to a `nil` pointer dereference if called before creating
+the preview process. This is the case where `cmd * exec.Cmd` equals `nil`.
+
+I fixed this with a short-circuiting nil check.
+
+Another thing that I forgot about was to clean up `cmd` after broadcasting the
+`SIGKILL`. This comes with the added feature of allowing the reuse of the
+`PdfPreviewProcess` structure.
+
+```go
+// Close kills the zathura process
+func (ppp *PdfPreviewProcess) Close() error {
+	// Do nothing when no process is running. This avoids a nil pointer
+	// dereference.
+	if ppp.cmd == nil {
+		return nil
+	}
+
+	// The negative sign broadcasts the signal to the whole process group
+	err := syscall.Kill(-ppp.cmd.Process.Pid, syscall.SIGKILL)
+	if err == nil {
+		ppp.cmd = nil // Keep the `cmd` on error.
+	}
+	return err
+}
+```
+
+### Interrupt handler goroutine leakage
+
+I'm under the suspicion that each call to `withPreview` is creating a new signal
+handler goroutine without properly stoping it before returning. To verify this,
+I added these two log lines:
+
+```go
+fmt.Fprintln(os.Stderr, "Starting signal handler for file: ", filePath)
+go func() {
+	<-c
+	ppp.Close()
+	fmt.Fprintln(os.Stderr, "Stoping signal handler for file: ", filePath)
+	os.Exit(1)
+}()
+```
+
+This allowed me to verify that those processes live until the program ends. This
+can be a problem given a large list of files. There are two ways that come to my
+mind in order to clean up those processes:
+
+- Add a `stopChannel` that gracefully stops the signal handler.
+- Move the signal handler away from the `withPreview` function. This solves the
+  aditional problem that might arise when the program has another signal handler
+  that does more than just closing the previewer process.
+
+I decided that the best solution is to leave the interruption handling to the
+caller. This prevents both the goroutine leakage and race conditions between the
+libraries interrupt handlers and any other interrupt handler that the user might
+implement. This increments flexibility with some added burden, but I think that
+it is a good trade off.
+
+To fix this I needed to convert `withPreview` into a method. This is necessary
+to allow outside access to the `PdfPreviewProcess.Close()` method.
+
+Then, I moved the signal handler to the main loop. This forces the user to
+implement a handler, but gives them the opportunity to extend it's behavior.
+
+Now, `main()` looks like this:
+
+```go
+func main() {
+	// ...
+
+	ppp := PdfPreviewProcess{}
+
+	// Set up a signal handler to clean up child processes on SIGINT (Ctrl-C)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-c
+		ppp.Close()
+		os.Exit(1)
+	}()
+
+	files := os.Args[1:]
+	for _, file := range files {
+		// Call to ppp.withPreview
+	}
+}
+```
+
+And now, `withPreview` looks like this.
+
+```go
+func (ppp *PdfPreviewProcess) withPreview(filePath string, action func(string) error) error {
+	// Preliminary checks
+
+	// Open Zathura
+	ppp.cmd = exec.Command("zathura", filePath)
+	ppp.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
+	if err := ppp.cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start zathura: %v", err)
+	}
+
+	defer ppp.Close()
+
+	return action(filePath)
+}
+```
