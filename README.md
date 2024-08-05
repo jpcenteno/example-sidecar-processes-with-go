@@ -1,4 +1,51 @@
-# Experiment: opening a PDF preview in GO
+# Sidecar Processes with Go Example
+
+This repository contains a standalone example of a Go program that opens a
+preview process while doing some other work. This functionality is part of a
+larger, private project I am working on. As I am new to Go, I created this as a
+self-contained example to share, document and keep for future reference.
+
+## Example program
+
+This example program loops over a list of input files while opening a
+user-specified preview program while it runs a function (which in my use case,
+waits for user input). Finally, it kills the preview process group when work is
+done.
+
+## Usage
+
+```
+go run main.go <preview-command> <file1> <file2> ...
+```
+
+I added a directory called `sample-files/` which you can use to test the
+program. Here is an example using [Zathura](https://pwmt.org/projects/zathura/),
+a document viewer for Linux.
+
+```sh
+go run main.go zathura sample-files/*.pdf
+```
+
+I don't have a Mac OS computer at hand, but I guess that you could try the
+`open` command. I don't know whether killing the process group will work or not.
+Please tell me if you try it.
+
+## Features
+
+- No dependencies other than the Go standard library.
+- Accepts an arbitrary preview command and a list of files to preview
+  sequentially.
+- Runs a sample job as parameter to run while the previewer is open.
+- Kills the preview process group when the work is done.
+- Provides an example interruption handler that cleans up the child process
+  group.
+
+## Pending work
+
+- [ ] Handle restarts when the user accidentally closes the preview process.
+  This is the case where the exit code is 0.
+- [ ] Handle the case where the preview process fails and exits with non-zero
+  exit code.
 
 ## Development log
 
