@@ -10,28 +10,28 @@ import (
 	"syscall"
 )
 
-// PdfPreviewProcess holds the command for the zathura process
-type PdfPreviewProcess struct {
+// PreviewProcess holds the command for the zathura process
+type PreviewProcess struct {
 	cmd *exec.Cmd
 }
 
 // Close kills the zathura process
-func (ppp *PdfPreviewProcess) Close() error {
+func (pp *PreviewProcess) Close() error {
 	// Do nothing when no process is running. This avoids a nil pointer
 	// dereference.
-	if ppp.cmd == nil {
+	if pp.cmd == nil {
 		return nil
 	}
 
 	// The negative sign broadcasts the signal to the whole process group
-	err := syscall.Kill(-ppp.cmd.Process.Pid, syscall.SIGKILL)
+	err := syscall.Kill(-pp.cmd.Process.Pid, syscall.SIGKILL)
 	if err == nil {
-		ppp.cmd = nil // Keep the `cmd` on error.
+		pp.cmd = nil // Keep the `cmd` on error.
 	}
 	return err
 }
 
-func (ppp *PdfPreviewProcess) withPreview(filePath string, action func(string) error) error {
+func (pp *PreviewProcess) withPreview(filePath string, action func(string) error) error {
 	// Preliminary checks
 	if strings.ToLower(filepath.Ext(filePath)) != ".pdf" {
 		return fmt.Errorf("provided file is not a PDF: %s", filePath)
@@ -42,13 +42,13 @@ func (ppp *PdfPreviewProcess) withPreview(filePath string, action func(string) e
 	}
 
 	// Open Zathura
-	ppp.cmd = exec.Command("zathura", filePath)
-	ppp.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
-	if err := ppp.cmd.Start(); err != nil {
+	pp.cmd = exec.Command("zathura", filePath)
+	pp.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
+	if err := pp.cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start zathura: %v", err)
 	}
 
-	defer ppp.Close()
+	defer pp.Close()
 
 	return action(filePath)
 }
@@ -60,14 +60,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	ppp := PdfPreviewProcess{}
+	pp := PreviewProcess{}
 
 	// Set up a signal handler to clean up child processes on SIGINT (Ctrl-C)
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-c
-		err := ppp.Close()
+		err := pp.Close()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to close preview process: %v\n", err)
 		}
@@ -76,7 +76,7 @@ func main() {
 
 	files := os.Args[1:]
 	for _, file := range files {
-		err := ppp.withPreview(file, func(file string) error {
+		err := pp.withPreview(file, func(file string) error {
 			fmt.Println("Press Enter to close the PDF previewer for", file)
 			fmt.Scanln()
 			return nil
