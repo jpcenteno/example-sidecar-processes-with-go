@@ -481,3 +481,51 @@ func (ppp *PdfPreviewProcess) withPreview(filePath string, action func(string) e
 	return action(filePath)
 }
 ```
+
+### Running a generic preview script
+
+I wanted to simplify the program by replacing Zathura with a generic preview
+program supplied by the user. This moves some of the complexity to an external
+program and simplifies the code providing better readability.
+
+- I renamed `PdfPreviewProcess` to `PreviewProcess`.
+- I added a field called `programName`.
+
+For the user, the only change is that the constructor requires a `programName`
+to be set. The rest of the API remains the same.
+
+```go
+func main() {
+	// Argument check.
+    // ...
+
+	programName := os.Args[1]
+	files := os.Args[2:]
+
+	pp := PreviewProcess{programName: programName}
+
+	// Set up a signal handler to clean up child processes on SIGINT (Ctrl-C)
+    // ...
+
+	for _, file := range files {
+		// Unchanged
+	}
+}
+```
+
+The `withPreview` function became simpler now that the preliminary checks are
+responsibility of the preview program.
+
+```go
+func (pp *PreviewProcess) withPreview(filePath string, action func(string) error) error {
+	pp.cmd = exec.Command(pp.programName, filePath)
+	pp.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
+	if err := pp.cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start %s: %v", pp.programName, err)
+	}
+
+	defer pp.Close()
+
+	return action(filePath)
+}
+```

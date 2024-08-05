@@ -5,17 +5,16 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 )
 
-// PreviewProcess holds the command for the zathura process
+// PreviewProcess holds the command for the previewer process
 type PreviewProcess struct {
-	cmd *exec.Cmd
+	programName string
+	cmd         *exec.Cmd
 }
 
-// Close kills the zathura process
+// Close kills the previewer process
 func (pp *PreviewProcess) Close() error {
 	// Do nothing when no process is running. This avoids a nil pointer
 	// dereference.
@@ -32,20 +31,10 @@ func (pp *PreviewProcess) Close() error {
 }
 
 func (pp *PreviewProcess) withPreview(filePath string, action func(string) error) error {
-	// Preliminary checks
-	if strings.ToLower(filepath.Ext(filePath)) != ".pdf" {
-		return fmt.Errorf("provided file is not a PDF: %s", filePath)
-	}
-
-	if _, err := exec.LookPath("zathura"); err != nil {
-		return fmt.Errorf("Command Zathura not found")
-	}
-
-	// Open Zathura
-	pp.cmd = exec.Command("zathura", filePath)
+	pp.cmd = exec.Command(pp.programName, filePath)
 	pp.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Give the process it's own group.
 	if err := pp.cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start zathura: %v", err)
+		return fmt.Errorf("failed to start %s: %v", pp.programName, err)
 	}
 
 	defer pp.Close()
@@ -54,13 +43,15 @@ func (pp *PreviewProcess) withPreview(filePath string, action func(string) error
 }
 
 func main() {
-	// Check if the file path is provided
 	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s [FILE]...\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [PREVIEWER_CMD] [FILE]...\n", os.Args[0])
 		os.Exit(1)
 	}
 
-	pp := PreviewProcess{}
+	programName := os.Args[1]
+	files := os.Args[2:]
+
+	pp := PreviewProcess{programName: programName}
 
 	// Set up a signal handler to clean up child processes on SIGINT (Ctrl-C)
 	c := make(chan os.Signal, 1)
@@ -74,10 +65,9 @@ func main() {
 		os.Exit(1)
 	}()
 
-	files := os.Args[1:]
 	for _, file := range files {
 		err := pp.withPreview(file, func(file string) error {
-			fmt.Println("Press Enter to close the PDF previewer for", file)
+			fmt.Println("Press Enter to close the previewer for", file)
 			fmt.Scanln()
 			return nil
 		})
