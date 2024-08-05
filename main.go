@@ -67,7 +67,10 @@ func main() {
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-c
-		ppp.Close()
+		err := ppp.Close()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to close preview process: %v\n", err)
+		}
 		os.Exit(1)
 	}()
 
